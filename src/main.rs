@@ -3,9 +3,12 @@ mod tree;
 use std::io::{stdin, BufRead};
 
 use eyre::Context;
-use log::{debug, info, trace};
+use log::{debug, trace};
 
+use petgraph::dot::Dot;
 use tree::Node;
+
+use crate::tree::forest_as_dag;
 
 fn main() -> eyre::Result<()> {
     env_logger::init();
@@ -29,9 +32,16 @@ fn main() -> eyre::Result<()> {
         .collect::<Result<Vec<Node>, serde_json::Error>>()
         .wrap_err("invalid JSON")?;
 
-    for tree in forest {
-        info!("{:?}", tree);
+    for tree in &forest {
+        tree.validate()?;
+        debug!("{:?}", tree);
     }
+
+    let dag = forest_as_dag(forest.iter());
+
+    let dot = Dot::new(&dag);
+
+    println!("{}", dot);
 
     Ok(())
 }
