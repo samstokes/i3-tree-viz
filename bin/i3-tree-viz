@@ -1,0 +1,43 @@
+#!/bin/bash
+# Visualize the I3 layout tree, by polling it repeatedly.
+# Will probably eat your battery, so use it for learning, and close it
+# when you're done.
+
+set -ueo pipefail
+
+require() {
+  local cmd="$1"
+  command -v "$cmd" || {
+    echo "Requires $1 (from $2)" >&2
+    exit 1
+  }
+}
+
+DOT=$(require dot "graphviz")
+I3_SAVE_TREE=$(require i3-save-tree "i3")
+I3_TREE_DOT=$(require i3-tree-dot "this repo, try 'cargo install --path .'")
+VIEWER=$(require eog "Gnome")
+
+svg=$(mktemp --suffix=.svg)
+trap "if [[ -r \"$svg\".pid ]]; then xargs kill <\"$svg\".pid; fi; rm -f \"$svg\"{,.{new,sha1,pid}}" EXIT
+
+while true; do
+  "$I3_SAVE_TREE" \
+    | "$I3_TREE_DOT" \
+    | "$DOT" -Tsvg >"$svg".new
+
+  if ! sed 's/svg/svg.new/' "$svg".sha1 | sha1sum -c -; then
+    mv "$svg"{.new,} && sha1sum "$svg" > "$svg".sha1
+  fi
+
+  if [[ ! -f "$svg".pid ]]; then
+    "$VIEWER" "$svg" &
+    echo $! >"$svg".pid
+  fi
+
+  if ! xargs ps -Fp <"$svg".pid; then
+    break
+  fi
+
+  sleep 1
+done
