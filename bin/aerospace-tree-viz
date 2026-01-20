@@ -19,7 +19,7 @@ AEROSPACE_TREE_DOT=$(require aerospace-tree-dot "this repo, try 'cargo install -
 
 # Create temp file - macOS mktemp works differently than Linux
 tmpbase=$(mktemp -t aerospace-tree)
-svg="$tmpbase.svg"
+img="$tmpbase.svg"
 
 # On macOS, open SVG with Safari; on Linux use eog
 if [[ "$(uname)" == "Darwin" ]]; then
@@ -28,27 +28,27 @@ else
   VIEWER=$(require eog "Gnome")
   viewer() { "$VIEWER" "$1"; }
 fi
-trap "if [[ -r \"$svg\".pid ]]; then xargs kill <\"$svg\".pid 2>/dev/null || true; fi; rm -f \"$tmpbase\" \"$svg\"{,.{new,sha256,pid}}" EXIT
+trap "if [[ -r \"$img\".pid ]]; then xargs kill <\"$img\".pid 2>/dev/null || true; fi; rm -f \"$tmpbase\" \"$img\"{,.{new,sha256,pid}}" EXIT
 
 while true; do
-  "$AEROSPACE" list-windows --all --json \
+  "$AEROSPACE" list-windows --all --json --format '%{window-id} %{app-name} %{workspace} %{window-title}' \
     | "$AEROSPACE_TREE_DOT" \
-    | "$DOT" -Tsvg >"$svg".new
+    | "$DOT" -Tsvg >"$img".new
 
   # Use sha256 instead of sha1 for better compatibility
-  if ! (echo "$(cat "$svg".new | shasum -a 256 | cut -d' ' -f1) $svg.new" | shasum -a 256 -c - 2>/dev/null && \
-        cat "$svg".sha256 2>/dev/null | shasum -a 256 -c - 2>/dev/null); then
-    mv "$svg"{.new,} && shasum -a 256 "$svg" > "$svg".sha256
+  if ! (echo "$(cat "$img".new | shasum -a 256 | cut -d' ' -f1) $img.new" | shasum -a 256 -c - 2>/dev/null && \
+        cat "$img".sha256 2>/dev/null | shasum -a 256 -c - 2>/dev/null); then
+    mv "$img"{.new,} && shasum -a 256 "$img" > "$img".sha256
   fi
 
-  if [[ ! -f "$svg".pid ]]; then
-    viewer "$svg" &
-    echo $! >"$svg".pid
+  if [[ ! -f "$img".pid ]]; then
+    viewer "$img" &
+    echo $! >"$img".pid
   fi
 
   # Check if viewer is still running (different approach for macOS vs Linux)
-  if [[ -r "$svg".pid ]]; then
-    if ! ps -p $(cat "$svg".pid) >/dev/null 2>&1; then
+  if [[ -r "$img".pid ]]; then
+    if ! ps -p $(cat "$img".pid) >/dev/null 2>&1; then
       break
     fi
   fi

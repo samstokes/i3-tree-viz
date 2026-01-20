@@ -19,25 +19,27 @@ pub struct AerospaceWindow {
 
 pub type Dag = DiGraph<String, &'static str>;
 
+const MAX_TITLE_LEN: usize = 40;
+
+fn truncate(s: &str, max_len: usize) -> String {
+    if s.len() <= max_len {
+        s.to_string()
+    } else {
+        format!("{}…", &s[..max_len - 1])
+    }
+}
+
 impl AerospaceWindow {
     pub fn description(&self) -> String {
-        let mut parts = Vec::new();
+        let app = self.app_name.as_deref().unwrap_or("?");
 
         if let Some(title) = &self.window_title {
             if !title.is_empty() {
-                parts.push(title.clone());
+                return format!("[{}] {}", app, truncate(title, MAX_TITLE_LEN));
             }
         }
 
-        if let Some(app_name) = &self.app_name {
-            parts.push(format!("({})", app_name));
-        }
-
-        if parts.is_empty() {
-            parts.push(format!("Window {}", self.window_id));
-        }
-
-        parts.join(" ")
+        format!("[{}] Window {}", app, self.window_id)
     }
 
     pub fn add_to_dag(
@@ -68,11 +70,15 @@ pub fn windows_as_dag(windows: &[AerospaceWindow]) -> Dag {
     let mut workspace_names: Vec<_> = by_workspace.keys().cloned().collect();
     workspace_names.sort();
 
+    // Create root node so workspaces stack vertically
+    let root = dag.add_node("Workspaces".to_string());
+
     for workspace_name in workspace_names {
         let workspace_windows = &by_workspace[&workspace_name];
 
         // Create workspace node
-        let workspace_node = dag.add_node(format!("Workspace: {}", workspace_name));
+        let workspace_node = dag.add_node(format!("[{}]", workspace_name));
+        dag.add_edge(root, workspace_node, "");
 
         // Add all windows in this workspace
         for window in workspace_windows {

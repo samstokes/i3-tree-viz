@@ -31,8 +31,12 @@ fn main() -> eyre::Result<()> {
     let dag = windows_as_dag(&windows);
 
     let dot = Dot::new(&dag);
+    let dot_str = format!("{}", dot);
 
-    println!("{}", dot);
+    // Insert rankdir=LR to make graph left-to-right (workspaces stack vertically)
+    let dot_str = dot_str.replacen("{", "{\n    rankdir=LR;", 1);
+
+    println!("{}", dot_str);
 
     Ok(())
 }
