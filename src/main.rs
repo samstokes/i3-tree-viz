@@ -1,52 +1,38 @@
 mod tree;
 
-use std::io::{stdin, BufRead};
+use std::io::{stdin, Read};
 
 use eyre::Context;
-use log::{debug, trace};
+use log::debug;
 
 use petgraph::dot::Dot;
-use tree::Node;
+use tree::AerospaceWindow;
 
-use crate::tree::forest_as_dag;
+use crate::tree::windows_as_dag;
 
 fn main() -> eyre::Result<()> {
     env_logger::init();
 
-    let mut filtered_input = String::with_capacity(1024);
-    for line in stdin()
-        .lock()
-        .lines()
-        .filter_map(Result::ok)
-        .filter(is_not_comment)
-    {
-        trace!("non-comment line: {}", line);
-        filtered_input.push_str(&line);
-        filtered_input.push('\n');
+    let mut input = String::new();
+    stdin()
+        .read_to_string(&mut input)
+        .wrap_err("failed to read stdin")?;
+
+    debug!("input: {}", input);
+
+    let windows: Vec<AerospaceWindow> = serde_json::from_str(&input)
+        .wrap_err("invalid JSON - expected array of window objects from 'aerospace list-windows --all --json'")?;
+
+    debug!("parsed {} windows", windows.len());
+    for window in &windows {
+        debug!("{:?}", window);
     }
 
-    debug!("filtered input: {}", filtered_input);
-
-    let forest = serde_json::Deserializer::from_str(&filtered_input)
-        .into_iter()
-        .collect::<Result<Vec<Node>, serde_json::Error>>()
-        .wrap_err("invalid JSON")?;
-
-    for tree in &forest {
-        tree.validate()?;
-        debug!("{:?}", tree);
-    }
-
-    let dag = forest_as_dag(forest.iter());
+    let dag = windows_as_dag(&windows);
 
     let dot = Dot::new(&dag);
 
     println!("{}", dot);
 
     Ok(())
-}
-
-fn is_not_comment(line: &String) -> bool {
-    trace!("line: {}", line);
-    !line.trim_start().starts_with("//")
 }

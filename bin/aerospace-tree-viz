@@ -1,0 +1,52 @@
+#!/bin/bash
+# Visualize the Aerospace window tree, by polling it repeatedly.
+# Will probably eat your battery, so use it for learning, and close it
+# when you're done.
+
+set -ueo pipefail
+
+require() {
+  local cmd="$1"
+  command -v "$cmd" || {
+    echo "Requires $1 (from $2)" >&2
+    exit 1
+  }
+}
+
+DOT=$(require dot "graphviz")
+AEROSPACE=$(require aerospace "AeroSpace window manager")
+AEROSPACE_TREE_DOT=$(require aerospace-tree-dot "this repo, try 'cargo install --path .'")
+# On macOS, use 'open' instead of 'eog'
+VIEWER=$(command -v open || command -v eog || {
+  echo "Requires 'open' (macOS) or 'eog' (Linux)" >&2
+  exit 1
+})
+
+svg=$(mktemp -t aerospace-tree.XXXXXX.svg)
+trap "if [[ -r \"$svg\".pid ]]; then xargs kill <\"$svg\".pid 2>/dev/null || true; fi; rm -f \"$svg\"{,.{new,sha256,pid}}" EXIT
+
+while true; do
+  "$AEROSPACE" list-windows --all --json \
+    | "$AEROSPACE_TREE_DOT" \
+    | "$DOT" -Tsvg >"$svg".new
+
+  # Use sha256 instead of sha1 for better compatibility
+  if ! (echo "$(cat "$svg".new | shasum -a 256 | cut -d' ' -f1) $svg.new" | shasum -a 256 -c - 2>/dev/null && \
+        cat "$svg".sha256 2>/dev/null | shasum -a 256 -c - 2>/dev/null); then
+    mv "$svg"{.new,} && shasum -a 256 "$svg" > "$svg".sha256
+  fi
+
+  if [[ ! -f "$svg".pid ]]; then
+    "$VIEWER" "$svg" &
+    echo $! >"$svg".pid
+  fi
+
+  # Check if viewer is still running (different approach for macOS vs Linux)
+  if [[ -r "$svg".pid ]]; then
+    if ! ps -p $(cat "$svg".pid) >/dev/null 2>&1; then
+      break
+    fi
+  fi
+
+  sleep 1
+done
