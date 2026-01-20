@@ -16,14 +16,19 @@ require() {
 DOT=$(require dot "graphviz")
 AEROSPACE=$(require aerospace "AeroSpace window manager")
 AEROSPACE_TREE_DOT=$(require aerospace-tree-dot "this repo, try 'cargo install --path .'")
-# On macOS, use 'open' instead of 'eog'
-VIEWER=$(command -v open || command -v eog || {
-  echo "Requires 'open' (macOS) or 'eog' (Linux)" >&2
-  exit 1
-})
 
-svg=$(mktemp -t aerospace-tree.XXXXXX.svg)
-trap "if [[ -r \"$svg\".pid ]]; then xargs kill <\"$svg\".pid 2>/dev/null || true; fi; rm -f \"$svg\"{,.{new,sha256,pid}}" EXIT
+# Create temp file - macOS mktemp works differently than Linux
+tmpbase=$(mktemp -t aerospace-tree)
+svg="$tmpbase.svg"
+
+# On macOS, open SVG with Safari; on Linux use eog
+if [[ "$(uname)" == "Darwin" ]]; then
+  viewer() { open -a Safari "$1"; }
+else
+  VIEWER=$(require eog "Gnome")
+  viewer() { "$VIEWER" "$1"; }
+fi
+trap "if [[ -r \"$svg\".pid ]]; then xargs kill <\"$svg\".pid 2>/dev/null || true; fi; rm -f \"$tmpbase\" \"$svg\"{,.{new,sha256,pid}}" EXIT
 
 while true; do
   "$AEROSPACE" list-windows --all --json \
@@ -37,7 +42,7 @@ while true; do
   fi
 
   if [[ ! -f "$svg".pid ]]; then
-    "$VIEWER" "$svg" &
+    viewer "$svg" &
     echo $! >"$svg".pid
   fi
 
